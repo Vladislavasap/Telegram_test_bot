@@ -50,50 +50,43 @@ def get_api_answer(current_timestamp):
         response = requests.get(ENDPOINT, headers=HEADERS, params=params)
     except ConnectionError:
         raise ConnectionError(f'Ошибка при попытке доступака к {ENDPOINT},'
-              'c {HEADERS}, {params}, и статус кодом {response.status_code}')
+              f'c {HEADERS}, {params}')
     if response.status_code != 200:
         raise ConnectionError(f'Ошибка при попытке доступака к {ENDPOINT},'
-              'c {HEADERS}, {params}, и статус кодом {response.status_code}')
+              f'c {HEADERS}, {params}, и статус кодом {response.status_code}')
     try:
         return response.json()
     except Exception as error:
-        raise f'Произошла ошибка {error}'
+        raise (f'Произошла ошибка {error}, при попытке доступака к {ENDPOINT},'
+               f'c {HEADERS}, {params}, и статус кодом {response.status_code}')
 
 
 def check_response(response):
     """Проверка ответа Api на корректность."""
     if not isinstance(response, dict):
-        ValueError('Тип данных не словарь')
-    if 'homeworks' in response:
-        exist = True
-    elif not response['homeworks']:
-        raise KeyError('Ключа homeworks нет в словаре')
-    if exist:
+        raise TypeError('Тип данных не словарь')
+    if 'homeworks' not in response:
+        raise KeyError(f'Ключа homeworks нет в словаре:{response}')
+    else:
         homework = response['homeworks']
-    if 'current_date' in response:
-        date = True
-    else:
-        raise KeyError('Ключа current_date нет в словаре')
-    if isinstance(homework, list) and date:
+    if 'current_date' not in response:
+        raise KeyError(f'Ключа current_date нет в словаре:{response}')
+    if isinstance(homework, list):
         return homework
-    else:
-        raise ValueError(f'Получен не обЬект не типа list {homework}')
 
 
 def parse_status(homework):
     """Извлекает статус конкретной дз и проверяет его."""
     if not isinstance(homework, dict):
         raise TypeError(f'Тип данных должен быть dict, {homework}')
-    if 'homework_name' in homework:
+    if 'homework_name' not in homework:
+        raise KeyError(f'Не удалось получить данные домашки:{homework}')
+    else:
         homework_name = homework['homework_name']
-        if homework_name is None:
-            raise Exception(f'Не удалось получить данные домашки:{homework}')
-    else:
-        raise KeyError('Ключа homework_name нет в словаре')
-    if 'status' in homework:
-        homework_status = homework['status']
-    else:
+    if 'status' not in homework:
         raise KeyError(f'Ключ status не найден:{homework}')
+    else:
+        homework_status = homework['status']
     if homework_status is None:
         raise Exception(f'Не удалось получить данные дз:{homework_status}')
     if homework_status in HOMEWORK_STATUSES.keys():
@@ -114,13 +107,13 @@ def check_tokens():
 
 def main():
     """Основная логика работы бота."""
-    is_tokens_valid = check_tokens()
-    if not is_tokens_valid:
+    if not check_tokens():
         logger.error('Выполнение программы прервано из-за отсутствия токена')
         sys.exit()
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     current_timestamp = int(time.time()) - 36000
     status = ''
+    check_ms = ''
     while True:
         try:
             response = get_api_answer(current_timestamp)
@@ -128,17 +121,18 @@ def main():
             checked_response = check_response(response)
             parsed_status = parse_status(checked_response[0])
             if parsed_status != status:
+                status = parsed_status
                 send_message(bot, parsed_status)
             logging.info('Сообщение с новым статусом отправлено')
             current_timestamp = response['current_date']
             logging.info('Записан текущий статус проверки домашки')
-        except TelegramError():
+        except TelegramError:
             logging.info('Проблема с телеграм, сообщение не отправлено')
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
             logging.error(f'Сбой в работе программы: {error}')
-            check_ms = message
             if message != check_ms:
+                check_ms = message
                 send_message(bot, message)
                 logger.info('Отправлено сообщение об ошибке')
         finally:

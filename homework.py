@@ -57,8 +57,9 @@ def get_api_answer(current_timestamp):
     try:
         return response.json()
     except Exception as error:
-        raise (f'Произошла ошибка {error}, при попытке доступака к {ENDPOINT},'
-               f'c {HEADERS}, {params}, и статус кодом {response.status_code}')
+        raise Exception(f'Ошибка {error}, при попытке доступака к {ENDPOINT},'
+                        f'c {HEADERS}, {params},'
+                        f'и статус кодом {response.status_code}')
 
 
 def check_response(response):
@@ -67,12 +68,13 @@ def check_response(response):
         raise TypeError('Тип данных не словарь')
     if 'homeworks' not in response:
         raise KeyError(f'Ключа homeworks нет в словаре:{response}')
-    else:
-        homework = response['homeworks']
+    homework = response['homeworks']
     if 'current_date' not in response:
         raise KeyError(f'Ключа current_date нет в словаре:{response}')
     if isinstance(homework, list):
         return homework
+    else:
+        raise TypeError(f'Переменная homework не список:{homework}')
 
 
 def parse_status(homework):
@@ -81,12 +83,10 @@ def parse_status(homework):
         raise TypeError(f'Тип данных должен быть dict, {homework}')
     if 'homework_name' not in homework:
         raise KeyError(f'Не удалось получить данные домашки:{homework}')
-    else:
-        homework_name = homework['homework_name']
+    homework_name = homework['homework_name']
     if 'status' not in homework:
         raise KeyError(f'Ключ status не найден:{homework}')
-    else:
-        homework_status = homework['status']
+    homework_status = homework['status']
     if homework_status is None:
         raise Exception(f'Не удалось получить данные дз:{homework_status}')
     if homework_status in HOMEWORK_STATUSES.keys():
@@ -111,7 +111,7 @@ def main():
         logger.error('Выполнение программы прервано из-за отсутствия токена')
         sys.exit()
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
-    current_timestamp = int(time.time()) - 36000
+    current_timestamp = int(time.time())
     status = ''
     check_ms = ''
     while True:
@@ -126,8 +126,6 @@ def main():
             logging.info('Сообщение с новым статусом отправлено')
             current_timestamp = response['current_date']
             logging.info('Записан текущий статус проверки домашки')
-        except TelegramError:
-            logging.info('Проблема с телеграм, сообщение не отправлено')
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
             logging.error(f'Сбой в работе программы: {error}')
